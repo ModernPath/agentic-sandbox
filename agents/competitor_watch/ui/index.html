@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sales radar · Agentic Sandbox</title>
+  <link rel="stylesheet" href="/static/sandbox.css">
+  <style>
+    :root { --accent: #1f5fbf; --high: #b42318; --medium: #b54708; --low: #475467; --line: #d0d5dd; --muted: #667085; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --accent: #7aa7f0; --high: #f97066; --medium: #fdb022; --low: #98a2b3; --line: #344054; --muted: #98a2b3; }
+    }
+    :root[data-theme="dark"] { --accent: #7aa7f0; --high: #f97066; --medium: #fdb022; --low: #98a2b3; --line: #344054; --muted: #98a2b3; }
+    .radar-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+    .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+    .kpi .value { font-size: 1.8rem; font-weight: 600; }
+    .kpi .label { color: var(--muted); font-size: 0.85rem; }
+    .radar-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+    .radar-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+    .chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 0.75rem; margin-right: 4px; }
+    .chip.high { color: var(--high); border-color: var(--high); }
+    .chip.medium { color: var(--medium); border-color: var(--medium); }
+    .chip.low { color: var(--low); }
+    .signal { border-top: 1px solid var(--line); padding: 10px 0; }
+    .signal h3 { margin: 0 0 4px; font-size: 1rem; }
+    .signal .meta { color: var(--muted); font-size: 0.85rem; }
+    .signal .actions button { margin-right: 6px; }
+    .bar-row { display: grid; grid-template-columns: 110px 1fr 36px; gap: 8px; align-items: center; font-size: 0.9rem; margin: 6px 0; }
+    .bar-track { background: var(--line); border-radius: 4px; height: 10px; overflow: hidden; }
+    .bar-fill { background: var(--accent); height: 10px; }
+    .chat-log { min-height: 180px; max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+    .bubble { padding: 8px 10px; border-radius: 8px; margin: 6px 0; white-space: pre-wrap; }
+    .bubble.user { background: var(--accent); color: #fff; margin-left: 20%; }
+    .bubble.assistant { border: 1px solid var(--line); margin-right: 10%; }
+    .tools { color: var(--muted); font-size: 0.8rem; }
+    .chat-form { display: flex; gap: 8px; margin-top: 8px; }
+    .chat-form input { flex: 1; }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .filters select { width: auto; flex: 1 1 140px; }
+    #chart { width: 100%; height: 140px; }
+    @media (max-width: 720px) {
+      .radar-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .radar-grid, .radar-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">Sales radar</span>
+    <span class="who" id="who"></span>
+    <button type="button" class="secondary" id="signout">Sign out</button>
+  </header>
+  <main class="page">
+    <h1>Sales radar</h1>
+    <p class="subtle">Competitor signals from public news. Each one has a source and a rating. Review it before anyone acts on it. Nothing is published.</p>
+    <p id="message" role="status" aria-live="polite"></p>
+
+    <div class="radar-kpis" id="kpis"></div>
+
+    <div class="radar-grid">
+      <section class="panel">
+        <h2>Signals</h2>
+        <div class="filters">
+          <select id="f-status" aria-label="Status">
+            <option value="new">New</option><option value="reviewed">Reviewed</option><option value="dismissed">Dismissed</option>
+          </select>
+          <select id="f-importance" aria-label="Importance">
+            <option value="">Any importance</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+          </select>
+          <select id="f-category" aria-label="Category">
+            <option value="">Any category</option>
+            <option>pricing</option><option>product</option><option>hiring</option><option>funding</option>
+            <option>partnership</option><option>leadership</option><option>customers</option><option>other</option>
+          </select>
+          <select id="f-competitor" aria-label="Competitor"><option value="">Any competitor</option></select>
+        </div>
+        <div id="signals"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Ask the radar</h2>
+        <p class="subtle">The assistant answers from stored signals and can run a check. It does not remember this conversation after you leave the page.</p>
+        <div class="chat-log" id="chat-log" role="log" aria-live="polite"></div>
+        <form class="chat-form" id="chat-form">
+          <input name="message" maxlength="1000" placeholder="e.g. What changed at Engine Co this week?" aria-label="Message" required>
+          <button type="submit" id="chat-send">Send</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="radar-row">
+      <section class="panel">
+        <h2>Last 14 days</h2>
+        <svg id="chart" viewBox="0 0 560 140" preserveAspectRatio="none" role="img" aria-label="Signals per day, last 14 days"></svg>
+        <h2>By category, last 30 days</h2>
+        <div id="categories"></div>
+      </section>
+      <section class="panel">
+        <h2>Competitors</h2>
+        <p>
+          <button type="button" id="check-all">Check all now</button>
+        </p>
+        <div id="competitors"></div>
+        <details>
+          <summary>Add a competitor</summary>
+          <form id="competitor-form" class="row">
+            <input name="name" placeholder="Name" required minlength="2" maxlength="120" aria-label="Competitor name">
+            <input name="website" type="url" placeholder="Website (optional)" maxlength="300" aria-label="Website">
+            <input name="note" placeholder="Note (optional)" maxlength="500" aria-label="Note">
+            <button type="submit">Add</button>
+          </form>
+        </details>
+      </section>
+    </div>
+
+    <section class="panel" id="others">
+      <h2>Other agents</h2>
+      <div id="other-links"></div>
+    </section>
+  </main>
+  <script src="/static/sandbox.js"></script>
+  <script>
+    (function () {
+      var S = window.Sandbox;
+      var API = '/api/agents/competitor-watch';
+      var SVG_NS = 'http://www.w3.org/2000/svg';
+      var message = document.getElementById('message');
+      var turns = [];
+
+      function svg(tag, attrs) {
+        var node = document.createElementNS(SVG_NS, tag);
+        Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+        return node;
+      }
+      function say(text, isError) { message.textContent = ''; message.appendChild(S.banner(text, isError)); }
+      function when(iso) { return iso ? iso.replace('T', ' ').slice(0, 16) + ' UTC' : 'never'; }
+      function outcomeLabel(outcome) {
+        return { signals: 'found signals', no_new_sources: 'no new sources', no_signals: 'nothing relevant',
+                 error: 'check failed' }[outcome] || 'not checked yet';
+      }
+
+      document.getElementById('signout').addEventListener('click', function () { S.signOut(); });
+      S.api('GET', '/api/auth/me').then(function (me) {
+        document.getElementById('who').textContent = 'Signed in as ' + me.username;
+      }).catch(function () {});
+
+      function renderKpis(kpis) {
+        var box = document.getElementById('kpis');
+        box.textContent = '';
+        [['Watched competitors', kpis.watched_competitors], ['New signals', kpis.new_signals],
+         ['New high-importance', kpis.new_high_signals], ['Signals, last 7 days', kpis.signals_7d]].forEach(function (k) {
+          box.appendChild(S.el('div', { className: 'kpi' }, [
+            S.el('div', { className: 'value', text: String(k[1]) }), S.el('div', { className: 'label', text: k[0] })]));
+        });
+        box.appendChild(S.el('div', { className: 'kpi' }, [
+          S.el('div', { className: 'value', text: kpis.last_check_at ? when(kpis.last_check_at).slice(11, 16) + ' UTC' : '—' }),
+          S.el('div', { className: 'label', text: kpis.last_check_at ? 'Last check, ' + when(kpis.last_check_at).slice(0, 10) : 'No check yet' })]));
+      }
+
+      function renderDaily(daily) {
+        var chart = document.getElementById('chart');
+        chart.textContent = '';
+        var max = Math.max.apply(null, daily.map(function (d) { return d.count; }).concat([1]));
+        var step = 560 / daily.length;
+        daily.forEach(function (d, i) {
+          var h = Math.round((d.count / max) * 110);
+          var rect = svg('rect', { x: i * step + 6, y: 120 - h, width: step - 12, height: h, fill: 'var(--accent)' });
+          var title = svg('title', {});
+          title.textContent = d.day + ': ' + d.count;
+          rect.appendChild(title);
+          chart.appendChild(rect);
+        });
+        chart.appendChild(svg('line', { x1: 0, y1: 120, x2: 560, y2: 120, stroke: 'var(--line)' }));
+      }
+
+      function renderCategories(byCategory) {
+        var box = document.getElementById('categories');
+        box.textContent = '';
+        var names = Object.keys(byCategory).sort(function (a, b) { return byCategory[b] - byCategory[a]; });
+        if (!names.length) { box.appendChild(S.el('p', { className: 'empty', text: 'No signals in the last 30 days.' })); return; }
+        var max = byCategory[names[0]];
+        names.forEach(function (name) {
+          box.appendChild(S.el('div', { className: 'bar-row' }, [
+            S.el('span', { text: name }),
+            S.el('div', { className: 'bar-track' }, [S.el('div', { className: 'bar-fill', style: 'width:' + (byCategory[name] / max * 100) + '%' })]),
+            S.el('span', { text: String(byCategory[name]) })]));
+        });
+      }
+
+      function renderCompetitors(rows) {
+        var box = document.getElementById('competitors');
+        box.textContent = '';
+        if (!rows.length) { box.appendChild(S.el('p', { className: 'empty', text: 'No competitors yet. Add one below.' })); return; }
+        var table = S.el('table', {}, [S.el('thead', {}, [S.el('tr', {}, [
+          S.el('th', { text: 'Competitor' }), S.el('th', { text: 'New' }), S.el('th', { text: 'High' }),
+          S.el('th', { text: 'Last check' }), S.el('th', { text: '' })])])]);
+        var body = S.el('tbody', {});
+        rows.forEach(function (row) {
+          var checkButton = S.el('button', { type: 'button', className: 'secondary', text: 'Check' });
+          checkButton.addEventListener('click', function () { check(row.id, row.name); });
+          body.appendChild(S.el('tr', {}, [
+            S.el('td', { text: row.name }), S.el('td', { text: String(row.new_signals) }),
+            S.el('td', { text: String(row.new_high_signals) }),
+            S.el('td', { text: outcomeLabel(row.last_outcome) + ' · ' + when(row.last_checked_at) }),
+            S.el('td', {}, [checkButton])]));
+        });
+        table.appendChild(body);
+        box.appendChild(table);
+      }
+
+      function renderCompetitorFilter(rows) {
+        var select = document.getElementById('f-competitor');
+        var current = select.value;
+        select.textContent = '';
+        select.appendChild(S.el('option', { value: '', text: 'Any competitor' }));
+        rows.forEach(function (row) { select.appendChild(S.el('option', { value: row.id, text: row.name })); });
+        select.value = current;
+      }
+
+      function signalCard(signal) {
+        var actions = signal.status === 'new' ? S.el('div', { className: 'actions' }, [
+          S.el('button', { type: 'button', text: 'Reviewed', 'data-status': 'reviewed' }),
+          S.el('button', { type: 'button', className: 'secondary', text: 'Dismiss', 'data-status': 'dismissed' })]) : null;
+        if (actions) {
+          Array.prototype.forEach.call(actions.querySelectorAll('button'), function (button) {
+            button.addEventListener('click', function () { review(signal.id, button.getAttribute('data-status')); });
+          });
+        }
+        return S.el('article', { className: 'signal' }, [
+          S.el('h3', { text: signal.headline }),
+          S.el('div', {}, [
+            S.el('span', { className: 'chip', text: signal.category }),
+            S.el('span', { className: 'chip ' + signal.importance, text: signal.importance }),
+            S.el('span', { className: 'meta', text: signal.competitor_name + ' · ' + when(signal.created_at) })]),
+          S.el('p', { text: signal.summary }),
+          S.el('div', { className: 'meta' }, [S.link(signal.source_url, signal.source_title || signal.source_url)]),
+          actions]);
+      }
+
+      function loadSignals() {
+        var params = ['status=' + document.getElementById('f-status').value];
+        ['importance', 'category', 'competitor'].forEach(function (name) {
+          var value = document.getElementById('f-' + name).value;
+          if (value) params.push((name === 'competitor' ? 'competitor_id' : name) + '=' + encodeURIComponent(value));
+        });
+        return S.api('GET', API + '/signals?' + params.join('&')).then(function (data) {
+          var box = document.getElementById('signals');
+          box.textContent = '';
+          if (!data.signals.length) { box.appendChild(S.el('p', { className: 'empty', text: 'No signals match these filters.' })); return; }
+          data.signals.forEach(function (signal) { box.appendChild(signalCard(signal)); });
+        });
+      }
+
+      function review(id, status) {
+        S.api('PATCH', API + '/signals/' + encodeURIComponent(id), { status: status })
+          .then(function () { return load(); })
+          .catch(function (error) { say(error.message, true); });
+      }
+
+      function check(competitorId, name) {
+        say('Checking ' + (name || 'all competitors') + '…', false);
+        var body = competitorId ? { competitor_id: competitorId } : {};
+        S.api('POST', API + '/check', body).then(function (data) {
+          say('Checked ' + data.checked + ' competitor' + (data.checked === 1 ? '' : 's') + '.', false);
+          return load();
+        }).catch(function (error) { say(error.message, true); });
+      }
+
+      function load() {
+        return S.api('GET', API + '/dashboard').then(function (data) {
+          renderKpis(data.kpis);
+          renderDaily(data.daily);
+          renderCategories(data.by_category);
+          renderCompetitors(data.competitors);
+          renderCompetitorFilter(data.competitors);
+          return loadSignals();
+        }).catch(function (error) { say(error.message, true); });
+      }
+
+      ['f-status', 'f-importance', 'f-category', 'f-competitor'].forEach(function (id) {
+        document.getElementById(id).addEventListener('change', function () { loadSignals().catch(function () {}); });
+      });
+      document.getElementById('check-all').addEventListener('click', function () { check(null, null); });
+
+      document.getElementById('competitor-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var form = event.target;
+        var body = { name: form.name.value, website: form.website.value || null, note: form.note.value };
+        S.api('POST', API + '/competitors', body).then(function () {
+          form.reset();
+          say('Competitor added. Run a check to find its signals.', false);
+          return load();
+        }).catch(function (error) { say(error.message, true); });
+      });
+
+      function bubble(role, text, tools) {
+        var log = document.getElementById('chat-log');
+        var node = S.el('div', { className: 'bubble ' + role, text: text });
+        log.appendChild(node);
+        if (tools && tools.length) log.appendChild(S.el('div', { className: 'tools', text: 'Used: ' + tools.join(', ') }));
+        log.scrollTop = log.scrollHeight;
+      }
+
+      document.getElementById('chat-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var input = event.target.message;
+        var text = input.value.trim();
+        if (!text) return;
+        var send = document.getElementById('chat-send');
+        send.disabled = true;
+        bubble('user', text, []);
+        input.value = '';
+        var payload = { message: text, history: turns.slice(-20) };
+        S.api('POST', API + '/chat', payload).then(function (data) {
+          bubble('assistant', data.reply, data.tool_calls);
+          turns.push({ role: 'user', content: text });
+          turns.push({ role: 'assistant', content: data.reply });
+          return load();
+        }).catch(function (error) {
+          bubble('assistant', error.message);
+        }).then(function () { send.disabled = false; });
+      });
+
+      S.api('GET', '/api/agents').then(function (data) {
+        var box = document.getElementById('other-links');
+        var others = data.agents.filter(function (agent) { return agent.name !== 'competitor-watch'; });
+        if (!others.length) { box.appendChild(S.el('p', { className: 'empty', text: 'No other agents.' })); return; }
+        others.forEach(function (agent) {
+          box.appendChild(S.el('p', {}, [S.el('strong', { text: agent.title + ' — ' }), S.el('span', { text: agent.description + ' ' }),
+            agent.ui_path ? S.link(agent.ui_path, 'Open', 'button secondary') : null]));
+        });
+      }).catch(function () {});
+
+      load();
+    })();
+  </script>
+</body>
+</html>

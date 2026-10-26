@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMEIA dashboard</title>
+  <style>
+    :root { color-scheme: light dark; --fg:#17233a; --bg:#f4f7fb; --card:#fff; --muted:#5b6b82; --accent:#1d4ed8; --err:#b42318; --track:#dbe3ef; --ok:#15803d; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fg:#e6edf7; --bg:#0f172a; --card:#162238; --muted:#9fb0c7; --accent:#7aa2ff; --err:#ff8a80; --track:#2a3a57; --ok:#4ade80; } }
+    body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--fg); background:var(--bg); }
+    main { max-width:1000px; margin:0 auto; padding:24px 16px; }
+    a { color:var(--accent); font-weight:600; text-decoration:none; } a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    a.back { font-weight:600; }
+    h1 { font-size:22px; margin:12px 0 4px; } .subtle { color:var(--muted); margin:0 0 16px; }
+    .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+    .panel { background:var(--card); border-radius:10px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+    .panel h2 { font-size:17px; margin:0 0 10px; }
+    .panel.wide { grid-column:1 / -1; }
+    form { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 0; }
+    input, select, textarea { font:inherit; padding:7px 9px; border:1px solid #8a97ab; border-radius:7px; background:var(--card); color:var(--fg); min-width:0; }
+    input[type=number] { width:110px; }
+    button { font:inherit; font-weight:600; padding:7px 12px; border:0; border-radius:7px; background:var(--accent); color:#fff; cursor:pointer; }
+    button.secondary { background:none; color:var(--accent); border:1px solid var(--accent); }
+    button:disabled { opacity:.6; cursor:progress; }
+    ul { list-style:none; padding:0; margin:0; }
+    li { padding:8px 0; border-top:1px solid var(--track); }
+    li:first-child { border-top:0; }
+    .meta { color:var(--muted); font-size:13px; }
+    .bar { height:8px; background:var(--track); border-radius:4px; overflow:hidden; margin:6px 0; }
+    .bar > span { display:block; height:100%; background:var(--ok); width:0; }
+    .error { color:var(--err); font-weight:600; }
+    .toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/">← All agents</a>
+    <h1>EMEIA dashboard</h1>
+    <p class="subtle">Team targets, wins, market and competitor follow-up, and team tools. Market items appear here only after review.</p>
+    <div class="toolbar">
+      <label for="period">Period</label>
+      <input type="text" id="period" pattern="\d{4}-Q[1-4]" placeholder="2026-Q4" size="8">
+      <button type="button" class="secondary" id="reload">Show period</button>
+      <p id="message" role="status" aria-live="polite" class="subtle"></p>
+    </div>
+
+    <div class="grid">
+      <section class="panel wide" aria-labelledby="t-targets">
+        <h2 id="t-targets">Team targets (OKR)</h2>
+        <ul id="targets"></ul>
+        <form id="target-form">
+          <input name="objective" placeholder="Objective" required maxlength="200">
+          <input name="key_result" placeholder="Key result" required maxlength="200">
+          <input name="target_value" type="number" step="any" min="0.000001" placeholder="Target" required>
+          <input name="current_value" type="number" step="any" min="0" placeholder="Current" value="0">
+          <input name="unit" placeholder="Unit" maxlength="40">
+          <input name="owner" placeholder="Owner" maxlength="120">
+          <button type="submit">Add target</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="t-wins">
+        <h2 id="t-wins">New customers and wins</h2>
+        <ul id="wins"></ul>
+        <form id="win-form">
+          <input name="customer" placeholder="Customer" required maxlength="200">
+          <input name="description" placeholder="What was won" maxlength="2000">
+          <input name="value" type="number" step="any" min="0" placeholder="Value">
+          <input name="currency" placeholder="EUR" pattern="[A-Z]{3}" size="5" title="Three-letter code, e.g. EUR">
+          <input name="won_on" type="date" required>
+          <button type="submit">Add win</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="t-market">
+        <h2 id="t-market">Market and competitor follow-up</h2>
+        <ul id="market"></ul>
+        <h3 class="subtle">Review queue</h3>
+        <ul id="queue"></ul>
+        <form id="market-form">
+          <select name="kind" aria-label="Kind"><option value="market">Market</option><option value="competitor">Competitor</option></select>
+          <input name="title" placeholder="Title" required maxlength="200">
+          <input name="summary" placeholder="Summary" maxlength="2000">
+          <input name="source_url" type="url" placeholder="Source link (https://…)">
+          <button type="submit">Add for review</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="t-tools">
+        <h2 id="t-tools">Team tools</h2>
+        <ul id="tools"></ul>
+        <form id="tool-form">
+          <input name="label" placeholder="Tool name" required maxlength="120">
+          <input name="url" type="url" placeholder="https://…" required>
+          <button type="submit">Add link</button>
+        </form>
+      </section>
+    </div>
+  </main>
+  <script>
+    (function () {
+      var API = '/api/agents/emeia-dashboard';
+      var state = { period: '' };
+      var $ = function (id) { return document.getElementById(id); };
+
+      function say(text, isError) {
+        $('message').textContent = text || '';
+        $('message').className = isError ? 'error' : 'subtle';
+      }
+
+      function errorText(response) {
+        return response.json().then(function (body) {
+          var detail = body.detail;
+          if (Array.isArray(detail)) detail = detail.map(function (d) { return String(d.msg).replace(/^Value error, /, ''); }).join('; ');
+          return detail || body.error || ('Request failed (' + response.status + ')');
+        }, function () { return 'Request failed (' + response.status + ')'; });
+      }
+
+      function call(method, path, body) {
+        var options = { method: method, headers: { 'X-Sandbox-Request': '1' } };
+        if (body !== undefined) {
+          options.headers['Content-Type'] = 'application/json';
+          options.body = JSON.stringify(body);
+        }
+        return fetch(API + path, options).then(function (r) {
+          if (!r.ok) return errorText(r).then(function (t) { throw new Error(t); });
+          return r.json();
+        });
+      }
+
+      function item(parts) {
+        var li = document.createElement('li');
+        parts.forEach(function (p) {
+          if (p instanceof Node) { li.appendChild(p); return; }
+          li.appendChild(document.createTextNode(p));
+        });
+        return li;
+      }
+
+      function meta(text) {
+        var span = document.createElement('div');
+        span.className = 'meta';
+        span.textContent = text;
+        return span;
+      }
+
+      function safeLink(url, label) {
+        if (/^https?:\/\//i.test(url)) {
+          var a = document.createElement('a');
+          a.href = url; a.rel = 'noopener noreferrer'; a.target = '_blank';
+          a.textContent = label || url;
+          return a;
+        }
+        return document.createTextNode(label || url);
+      }
+
+      function renderTargets(targets) {
+        var list = $('targets');
+        list.textContent = '';
+        if (!targets.length) list.appendChild(item(['No targets for this period yet.']));
+        targets.forEach(function (t) {
+          var pct = t.progress === null ? 0 : Math.max(0, Math.min(100, Math.round(t.progress * 100)));
+          var label = t.objective + ' — ' + t.key_result;
+          var bar = document.createElement('div'); bar.className = 'bar';
+          var fill = document.createElement('span'); fill.style.width = pct + '%';
+          bar.appendChild(fill);
+          var input = document.createElement('input');
+          input.type = 'number'; input.step = 'any'; input.min = '0'; input.value = t.current_value;
+          input.setAttribute('aria-label', 'Current value for ' + label);
+          var save = document.createElement('button');
+          save.type = 'button'; save.className = 'secondary'; save.textContent = 'Update';
+          save.addEventListener('click', function () {
+            call('PATCH', '/targets/' + encodeURIComponent(t.id), { current_value: Number(input.value) })
+              .then(function () { say('Target updated.'); return load(); })
+              .catch(function (e) { say(e.message, true); });
+          });
+          var row = item([]);
+          row.appendChild(document.createTextNode(label));
+          row.appendChild(meta(t.owner + (t.owner ? ' · ' : '') + 'target ' + t.target_value + ' ' + t.unit + ' · ' + t.period));
+          row.appendChild(bar);
+          var form = document.createElement('div');
+          form.appendChild(input); form.appendChild(document.createTextNode(' ')); form.appendChild(save);
+          row.appendChild(form);
+          list.appendChild(row);
+        });
+      }
+
+      function renderWins(wins) {
+        var list = $('wins');
+        list.textContent = '';
+        if (!wins.length) list.appendChild(item(['No wins recorded for this period yet.']));
+        wins.forEach(function (w) {
+          var amount = w.value === null ? '' : ' · ' + w.value + ' ' + w.currency;
+          var row = item([w.customer]);
+          row.appendChild(meta(w.won_on + amount));
+          if (w.description) row.appendChild(meta(w.description));
+          list.appendChild(row);
+        });
+      }
+
+      function renderMarket(items) {
+        var list = $('market');
+        list.textContent = '';
+        if (!items.length) list.appendChild(item(['No reviewed items yet.']));
+        items.forEach(function (m) {
+          var row = item([m.title]);
+          row.appendChild(meta(m.kind + (m.source_url ? ' · ' : '')));
+          if (m.source_url) row.lastChild.appendChild(safeLink(m.source_url, 'source'));
+          if (m.summary) row.appendChild(meta(m.summary));
+          list.appendChild(row);
+        });
+      }
+
+      function renderQueue(items) {
+        var list = $('queue');
+        list.textContent = '';
+        if (!items.length) list.appendChild(item(['Nothing waiting for review.']));
+        items.forEach(function (m) {
+          var review = document.createElement('button');
+          review.type = 'button'; review.className = 'secondary'; review.textContent = 'Mark reviewed';
+          review.addEventListener('click', function () {
+            call('PATCH', '/market-items/' + encodeURIComponent(m.id), { reviewed: true })
+              .then(function () { say('Item published.'); return load(); })
+              .catch(function (e) { say(e.message, true); });
+          });
+          var row = item([m.title]);
+          row.appendChild(meta(m.kind + ' · ' + (m.summary || 'no summary')));
+          row.appendChild(review);
+          list.appendChild(row);
+        });
+      }
+
+      function renderTools(links) {
+        var list = $('tools');
+        list.textContent = '';
+        if (!links.length) list.appendChild(item(['No tool links yet.']));
+        links.forEach(function (l) { list.appendChild(item([safeLink(l.url, l.label)])); });
+      }
+
+      function load() {
+        var path = '/overview' + (state.period ? '?period=' + encodeURIComponent(state.period) : '');
+        return call('GET', path).then(function (data) {
+          state.period = data.period;
+          $('period').value = data.period;
+          renderTargets(data.targets);
+          renderWins(data.wins);
+          renderMarket(data.market_items);
+          renderTools(data.tool_links);
+          return call('GET', '/market-items?reviewed=false');
+        }).then(function (queue) {
+          renderQueue(queue.items);
+        }).catch(function (e) {
+          say(e.message || 'Could not load the dashboard.', true);
+        });
+      }
+
+      function submitForm(form, path, build, done) {
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          var data = new FormData(form);
+          var body;
+          try { body = build(data); } catch (e) { say(e.message, true); return; }
+          var button = form.querySelector('button[type=submit]');
+          button.disabled = true;
+          call('POST', path, body).then(function () {
+            form.reset();
+            say(done);
+            return load();
+          }).catch(function (e) {
+            say(e.message, true);
+          }).finally(function () { button.disabled = false; });
+        });
+      }
+
+      function text(data, key) { return String(data.get(key) || '').trim(); }
+
+      submitForm($('target-form'), '/targets', function (d) {
+        return {
+          period: state.period || $('period').value,
+          objective: text(d, 'objective'), key_result: text(d, 'key_result'),
+          target_value: Number(d.get('target_value')), current_value: Number(d.get('current_value') || 0),
+          unit: text(d, 'unit'), owner: text(d, 'owner')
+        };
+      }, 'Target added.');
+
+      submitForm($('win-form'), '/wins', function (d) {
+        var value = text(d, 'value');
+        return {
+          customer: text(d, 'customer'), description: text(d, 'description'),
+          value: value === '' ? null : Number(value), currency: text(d, 'currency').toUpperCase(),
+          won_on: text(d, 'won_on')
+        };
+      }, 'Win added.');
+
+      submitForm($('market-form'), '/market-items', function (d) {
+        var url = text(d, 'source_url');
+        return {
+          kind: text(d, 'kind'), title: text(d, 'title'), summary: text(d, 'summary'),
+          source_url: url === '' ? null : url
+        };
+      }, 'Added to the review queue.');
+
+      submitForm($('tool-form'), '/tool-links', function (d) {
+        return { label: text(d, 'label'), url: text(d, 'url') };
+      }, 'Link added.');
+
+      $('reload').addEventListener('click', function () {
+        state.period = $('period').value.trim();
+        load();
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>

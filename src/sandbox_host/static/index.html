@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Command deck · Agentic Sandbox</title>
+  <link rel="stylesheet" href="/static/sandbox.css">
+  <style>
+    :root { --bg: #0c0f0e; --panel: #141a18; --line: #223029; --fg: #e4ebe7; --muted: #8a9a92; --accent: #3fd6b0; --warn: #f2b84b; --bad: #ff7a6b; --chip: #1a2421; }
+    body { background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    a { color: var(--accent); text-decoration: none; }
+    button { font: 600 12px system-ui, sans-serif; color: #0c0f0e; background: var(--accent); border: 0; border-radius: 4px; padding: 7px 10px; cursor: pointer; }
+    button.ghost { background: transparent; color: var(--fg); border: 1px solid #2f3e37; }
+    button:disabled { opacity: .5; cursor: default; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    input { background: #0c0f0e; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px; font: 13px system-ui, sans-serif; min-width: 0; }
+    .muted { color: var(--muted); }
+    .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+    .shell { display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; gap: 16px; min-height: 100vh; padding: 16px; box-sizing: border-box; }
+    .rail { display: flex; flex-direction: column; gap: 4px; align-content: start; }
+    .rail a { display: flex; justify-content: space-between; padding: 7px 10px; border-radius: 4px; color: #b7c5bd; }
+    .rail a.on { background: var(--chip); color: var(--fg); }
+    main { display: grid; gap: 14px; align-content: start; min-width: 0; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .kpi-value { font: 500 24px "SFMono-Regular", Menlo, monospace; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .agents { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .agent { text-align: left; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: grid; gap: 6px; cursor: pointer; font: inherit; }
+    .agent[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+    .agent .metric { font: 12px "SFMono-Regular", Menlo, monospace; color: var(--accent); }
+    .row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid #1d2723; }
+    .chip { font: 500 11px "SFMono-Regular", Menlo, monospace; padding: 3px 6px; border-radius: 3px; border: 1px solid #2f3e37; color: #b7c5bd; white-space: nowrap; }
+    .chip.high { color: var(--bad); border-color: #5b2b25; }
+    .chip.medium { color: var(--warn); border-color: #5a4619; }
+    .chat { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .scope { display: flex; flex-wrap: wrap; gap: 6px; }
+    .scope button { background: transparent; color: #b7c5bd; border: 1px solid #2f3e37; font-weight: 500; }
+    .scope button[aria-pressed="true"] { background: #1d3a33; color: var(--fg); border-color: var(--accent); }
+    .transcript { display: grid; gap: 12px; align-content: start; overflow-y: auto; max-height: 56vh; min-height: 220px; }
+    .msg { display: grid; gap: 4px; max-width: 94%; }
+    .msg.user { justify-self: end; }
+    .bubble { padding: 9px 12px; border-radius: 6px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
+    .msg.user .bubble { background: #1d3a33; }
+    .msg.assistant .bubble { background: var(--chip); border: 1px solid var(--line); }
+    .meta { font: 11px "SFMono-Regular", Menlo, monospace; color: var(--muted); }
+    .meta b { color: var(--accent); font-weight: 500; }
+    .form { display: flex; gap: 6px; }
+    .form input { flex: 1; }
+    .attached { font-size: 12px; color: var(--muted); }
+    .sig-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+    @media (max-width: 1100px) { .shell { grid-template-columns: minmax(0, 1fr); } .rail { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail panel">
+      <div style="font-weight: 600; padding: 4px 10px 12px">Sandbox <span class="muted" id="who"></span></div>
+      <a class="on" href="/">Home</a>
+      <div class="label" style="margin: 16px 10px 6px">Agents</div>
+      <div id="rail-agents"></div>
+      <button type="button" class="ghost" id="signout" style="margin-top: 16px">Sign out</button>
+    </aside>
+
+    <main>
+      <header style="display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap">
+        <div>
+          <div class="muted" style="font-size: 12px">Home · live data from your agents</div>
+          <h1 style="margin: 2px 0 0; font-size: 22px; font-weight: 600">Command deck</h1>
+        </div>
+        <span class="muted" id="updated" style="font-size: 12px"></span>
+      </header>
+      <p id="message" role="status" aria-live="polite" style="margin: 0"></p>
+
+      <section class="kpis" id="crm-kpis" aria-label="CRM numbers"></section>
+
+      <section class="kpis" id="kpis" aria-label="Key numbers from the agents"></section>
+
+      <section style="display: grid; gap: 10px">
+        <div class="label">Agents · select one for details</div>
+        <div class="agents" id="agents"></div>
+      </section>
+
+      <section class="panel" id="detail" aria-live="polite" style="display: grid; gap: 12px"></section>
+
+      <section class="panel" style="display: grid; gap: 10px" aria-labelledby="tasks-title">
+        <div class="label" id="tasks-title">Open tasks</div>
+        <div id="tasks"></div>
+      </section>
+
+      <section class="panel" style="display: grid; gap: 10px" aria-labelledby="stage-title">
+        <div class="label" id="stage-title">Pipeline by stage</div>
+        <div id="stage-bars"></div>
+      </section>
+
+      <section class="panel" style="display: grid; gap: 14px" aria-labelledby="create-title">
+        <div class="label" id="create-title">Add a record</div>
+        <form id="new-account-form" class="form" style="flex-wrap: wrap">
+          <input name="name" required minlength="2" maxlength="120" aria-label="Account name" placeholder="Account name">
+          <select name="type" aria-label="Account type" style="background: #0c0f0e; color: #e4ebe7; border: 1px solid #223029; border-radius: 4px; padding: 9px">
+            <option value="customer">Customer</option><option value="prospect">Prospect</option><option value="competitor">Competitor</option><option value="partner">Partner</option>
+          </select>
+          <button type="submit">Add account</button>
+        </form>
+        <form id="new-opportunity-form" class="form" style="flex-wrap: wrap">
+          <select name="account_id" id="opp-account" required aria-label="Account for the opportunity" style="background: #0c0f0e; color: #e4ebe7; border: 1px solid #223029; border-radius: 4px; padding: 9px"></select>
+          <input name="name" required minlength="2" maxlength="120" aria-label="Opportunity name" placeholder="Opportunity name">
+          <input name="amount" required type="number" min="0" step="0.01" aria-label="Amount in euros" placeholder="Amount (€)" style="width: 140px">
+          <button type="submit">Add opportunity</button>
+        </form>
+        <form id="new-task-form" class="form" style="flex-wrap: wrap">
+          <select name="account_id" id="task-account" required aria-label="Account for the task" style="background: #0c0f0e; color: #e4ebe7; border: 1px solid #223029; border-radius: 4px; padding: 9px"></select>
+          <input name="body" required minlength="2" maxlength="500" aria-label="Task" placeholder="What needs doing">
+          <input name="due" type="datetime-local" aria-label="Due date and time">
+          <button type="submit">Add task</button>
+        </form>
+      </section>
+
+      <section class="panel" style="display: grid; gap: 10px" aria-labelledby="accounts-title">
+        <div class="label" id="accounts-title">Accounts</div>
+        <div id="accounts"></div>
+      </section>
+
+      <section class="panel" style="display: grid; gap: 10px" aria-labelledby="drafts-title">
+        <div class="label" id="drafts-title">Drafts waiting for you</div>
+        <div id="drafts"></div>
+      </section>
+
+      <section class="panel" style="display: grid; gap: 6px" aria-labelledby="activity-title">
+        <div class="label" id="activity-title">Activity</div>
+        <div id="activity"></div>
+      </section>
+    </main>
+
+    <aside class="panel chat" aria-label="Ask the sandbox">
+      <div class="label">Ask the sandbox</div>
+      <div class="muted" style="font-size: 12px">Answers show the agent and the data they used. Limit the chat to one agent:</div>
+      <div class="scope" id="scope" role="group" aria-label="Limit the chat to one agent"></div>
+      <div class="transcript" id="chat-log" role="log" aria-live="polite"></div>
+      <div class="attached" id="attached"></div>
+      <form class="form" id="chat-form">
+        <input name="message" required maxlength="1000" aria-label="Message to the sandbox" placeholder="Ask about your agents">
+        <button type="submit" id="chat-send">Send</button>
+      </form>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center">
+        <label class="chip" for="file-input" style="cursor: pointer">Attach file</label>
+        <input type="file" id="file-input" hidden accept=".csv,.xlsx,.docx,.pptx,.pdf,.txt,.md,.json,.png,.jpg,.jpeg,.webp">
+      </div>
+    </aside>
+  </div>
+
+  <script src="/static/sandbox.js"></script>
+  <script>
+    (function () {
+      var S = window.Sandbox;
+      var state = { agents: [], panels: {}, selected: null, scope: '', turns: [], attachments: [], signals: [], importance: '' };
+      var message = document.getElementById('message');
+      var log = document.getElementById('chat-log');
+
+      function say(text, isError) { message.textContent = ''; message.appendChild(S.banner(text, isError)); }
+      function agentByName(name) { return state.agents.filter(function (a) { return a.name === name; })[0]; }
+      function enc(name) { return encodeURIComponent(name); }
+      function withPanel() { return state.agents.filter(function (a) { return a.has_panel; }); }
+
+      document.getElementById('signout').addEventListener('click', function () { S.signOut(); });
+      S.api('GET', '/api/auth/me').then(function (me) {
+        document.getElementById('who').textContent = me.username;
+      }).catch(function () {});
+
+      function load() {
+        return S.api('GET', '/api/agents').then(function (data) {
+          state.agents = data.agents;
+          if (!state.selected || !agentByName(state.selected)) state.selected = state.agents.length ? state.agents[0].name : null;
+          return Promise.all(withPanel().map(function (a) {
+            return S.api('GET', '/api/agents/' + enc(a.name) + '/panel').then(function (p) {
+              state.panels[a.name] = p;
+            }).catch(function () { state.panels[a.name] = { error: true }; });
+          }));
+        }).then(function () {
+          render();
+          document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+          return Promise.all([loadSignalsIfRadar(), loadDrafts(), loadActivity(), loadCrm()]);
+        }).catch(function (error) { say(error.message || 'Could not load the agents.', true); });
+      }
+
+      function render() {
+        renderRail();
+        renderKpis();
+        renderAgents();
+        renderScope();
+        renderDetail();
+      }
+
+      function renderRail() {
+        var box = document.getElementById('rail-agents');
+        box.textContent = '';
+        state.agents.forEach(function (a) {
+          box.appendChild(S.el('div', { class: 'row', style: 'padding: 6px 10px; border: 0' }, [
+            a.ui_path ? S.link(a.ui_path, a.title) : S.el('span', { text: a.title }),
+            S.el('span', { class: 'muted mono', text: a.has_panel ? 'live' : '' })
+          ]));
+        });
+      }
+
+      function renderKpis() {
+        var box = document.getElementById('kpis');
+        box.textContent = '';
+        withPanel().forEach(function (a) {
+          var p = state.panels[a.name];
+          if (!p || p.error || !p.metric) return;
+          box.appendChild(S.el('div', { class: 'panel' }, [
+            S.el('div', { class: 'label', text: p.metric.label }),
+            S.el('div', { class: 'kpi-value', text: String(p.metric.value) }),
+            S.el('div', { class: 'muted', style: 'font-size: 12px', text: a.title })
+          ]));
+        });
+        if (!box.childNodes.length) box.appendChild(S.el('p', { class: 'muted', text: 'No agent is reporting numbers yet.' }));
+      }
+
+      function renderAgents() {
+        var box = document.getElementById('agents');
+        box.textContent = '';
+        withPanel().forEach(function (a) {
+          var p = state.panels[a.name] || {};
+          var button = S.el('button', { type: 'button', class: 'agent', 'aria-pressed': String(state.selected === a.name) }, [
+            S.el('strong', { text: a.title }),
+            S.el('span', { class: 'metric', text: p.error ? 'Could not load' : (p.metric ? p.metric.label + ': ' + p.metric.value : '') }),
+            S.el('span', { class: 'muted', style: 'font-size: 12px', text: a.description })
+          ]);
+          button.addEventListener('click', function () { state.selected = a.name; state.signals = []; render(); loadSignalsIfRadar(); });
+          box.appendChild(button);
+        });
+        if (!box.childNodes.length) box.appendChild(S.el('p', { class: 'muted', text: 'No agents are registered.' }));
+      }
+
+      function renderScope() {
+        var box = document.getElementById('scope');
+        box.textContent = '';
+        var options = [{ name: '', title: 'All agents' }].concat(state.agents);
+        options.forEach(function (o) {
+          var b = S.el('button', { type: 'button', 'aria-pressed': String(state.scope === o.name), text: o.title });
+          b.addEventListener('click', function () { state.scope = o.name; renderScope(); });
+          box.appendChild(b);
+        });
+      }
+
+      function renderDetail() {
+        var box = document.getElementById('detail');
+        box.textContent = '';
+        var a = agentByName(state.selected);
+        if (!a) { box.appendChild(S.el('p', { class: 'muted', text: 'Select an agent to see its data.' })); return; }
+        var p = state.panels[a.name] || {};
+        var actions = [];
+        if (a.name === 'competitor-watch') {
+          actions.push(S.el('button', { type: 'button', text: 'Run check', id: 'run-check' }));
+        }
+        if (a.ui_path) actions.push(S.link(a.ui_path, 'Open ' + a.title, 'button ghost'));
+        box.appendChild(S.el('div', { style: 'display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center' }, [
+          S.el('div', {}, [S.el('div', { class: 'label', text: 'Agent detail' }), S.el('div', { style: 'font-size: 18px; font-weight: 600', text: a.title })]),
+          S.el('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap' }, actions)
+        ]));
+        box.appendChild(S.el('p', { class: 'muted', style: 'margin: 0', text: a.description }));
+        if (p.error) box.appendChild(S.banner('This agent could not load its summary.', true));
+        else box.appendChild(S.itemList(p.items, p.empty || 'Nothing to show yet.'));
+        if (a.name === 'competitor-watch') renderSignals(box);
+        var run = document.getElementById('run-check');
+        if (run) run.addEventListener('click', runCheck);
+      }
+
+      function renderSignals(box) {
+        var filters = S.el('div', { class: 'sig-filter', role: 'group', 'aria-label': 'Filter signals by importance' }, ['', 'high', 'medium'].map(function (level) {
+          var b = S.el('button', { type: 'button', class: 'ghost', 'aria-pressed': String(state.importance === level), text: level || 'All' });
+          b.addEventListener('click', function () { state.importance = level; loadSignalsIfRadar(); });
+          return b;
+        }));
+        var list = S.el('div', { id: 'signal-list' }, [S.el('p', { class: 'muted', text: 'Loading signals…' })]);
+        box.appendChild(S.el('div', {}, [S.el('div', { class: 'label', style: 'margin-bottom: 6px', text: 'Signals to review' }), filters, list]));
+      }
+
+      function loadSignalsIfRadar() {
+        if (state.selected !== 'competitor-watch') return;
+        var query = 'status=new&limit=25' + (state.importance ? '&importance=' + state.importance : '');
+        return S.api('GET', '/api/agents/competitor-watch/signals?' + query).then(function (data) {
+          state.signals = data.signals;
+          var list = document.getElementById('signal-list');
+          if (!list) return;
+          list.textContent = '';
+          if (!data.signals.length) { list.appendChild(S.el('p', { class: 'muted', text: 'No new signals. Run a check to look for news.' })); return; }
+          data.signals.forEach(function (s) {
+            var review = S.el('button', { type: 'button', class: 'ghost', text: 'Reviewed' });
+            review.addEventListener('click', function () { markReviewed(s.id); });
+            list.appendChild(S.el('div', { class: 'row', style: 'align-items: start' }, [
+              S.el('div', { style: 'min-width: 0' }, [
+                S.el('div', {}, [S.el('span', { class: 'chip ' + s.importance, text: s.importance }), ' ', S.el('strong', { text: s.headline })]),
+                S.el('div', { class: 'muted', style: 'font-size: 12px', text: s.competitor_name + ' · ' + s.category + ' · ' + s.summary }),
+                S.el('div', { style: 'font-size: 12px' }, [S.link(s.source_url, s.source_title || s.source_url)])
+              ]),
+              review
+            ]));
+          });
+        }).catch(function (error) { say(error.message, true); });
+      }
+
+      function markReviewed(id) {
+        S.api('PATCH', '/api/agents/competitor-watch/signals/' + encodeURIComponent(id), { status: 'reviewed' })
+          .then(function () { return loadSignalsIfRadar(); }).then(load)
+          .catch(function (error) { say(error.message, true); });
+      }
+
+      function runCheck() {
+        var button = document.getElementById('run-check');
+        if (button) button.disabled = true;
+        say('Checking competitors. This takes a minute.', false);
+        S.api('POST', '/api/agents/competitor-watch/check', {}).then(function (data) {
+          say('Checked ' + data.checked + ' competitor' + (data.checked === 1 ? '' : 's') + '.', false);
+          return loadSignalsIfRadar().then(load);
+        }).catch(function (error) { say(error.message, true); })
+          .then(function () { var b = document.getElementById('run-check'); if (b) b.disabled = false; });
+      }
+
+      function money(minor) {
+        return '€' + (minor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 });
+      }
+
+      function loadCrm() {
+        return Promise.all([S.api('GET', '/api/crm/summary'), S.api('GET', '/api/crm/tasks'), S.api('GET', '/api/crm/accounts')])
+          .then(function (results) {
+            var summary = results[0], tasks = results[1].tasks, accounts = results[2].accounts;
+            var kpis = document.getElementById('crm-kpis');
+            kpis.textContent = '';
+            [['Open pipeline', money(summary.open_pipeline_minor), summary.open_opportunities + ' open opportunities'],
+             ['Won this quarter', money(summary.won_quarter_minor), money(summary.won_minor) + ' won in total'],
+             ['Overdue tasks', String(summary.overdue_tasks), summary.open_tasks + ' open in total'],
+             ['Accounts', String(summary.accounts), 'customers, prospects, competitors, partners']].forEach(function (k) {
+              kpis.appendChild(S.el('div', { class: 'panel' }, [
+                S.el('div', { class: 'label', text: k[0] }),
+                S.el('div', { class: 'kpi-value', text: k[1] }),
+                S.el('div', { class: 'muted', style: 'font-size: 12px', text: k[2] })
+              ]));
+            });
+            var box = document.getElementById('tasks');
+            box.textContent = '';
+            if (!tasks.length) box.appendChild(S.el('p', { class: 'muted', text: 'No open tasks. Ask the sandbox to add one.' }));
+            tasks.forEach(function (t) {
+              var done = S.el('button', { type: 'button', class: 'ghost', text: 'Done' });
+              done.addEventListener('click', function () {
+                S.api('POST', '/api/crm/tasks/' + encodeURIComponent(t.id) + '/complete', {})
+                  .then(loadCrm).catch(function (error) { say(error.message, true); });
+              });
+              box.appendChild(S.el('div', { class: 'row' }, [
+                S.el('span', {}, [S.el('strong', { text: t.body }), ' ', S.el('span', { class: 'muted', style: 'font-size: 12px', text: t.due_at ? 'due ' + t.due_at.slice(0, 10) : 'no due date' })]),
+                done
+              ]));
+            });
+            var maxStage = Math.max.apply(null, summary.by_stage.map(function (x) { return x.amount_minor; }).concat([1]));
+            var bars = document.getElementById('stage-bars');
+            bars.textContent = '';
+            summary.by_stage.forEach(function (st) {
+              bars.appendChild(S.el('div', { class: 'row' }, [
+                S.el('span', { text: st.stage + ' · ' + st.count }),
+                S.el('div', { style: 'flex: 1; margin: 0 12px; height: 8px; background: #1d2723; border-radius: 2px; overflow: hidden' }, [
+                  S.el('div', { style: 'height: 100%; background: #3fd6b0; width: ' + Math.round(st.amount_minor / maxStage * 100) + '%' })
+                ]),
+                S.el('span', { class: 'mono muted', text: money(st.amount_minor) })
+              ]));
+            });
+            ['opp-account', 'task-account'].forEach(function (id) {
+              var select = document.getElementById(id);
+              select.textContent = '';
+              if (!accounts.length) select.appendChild(S.el('option', { value: '', text: 'Add an account first' }));
+              accounts.forEach(function (a) { select.appendChild(S.el('option', { value: a.id, text: a.name })); });
+            });
+            var list = document.getElementById('accounts');
+            list.textContent = '';
+            if (!accounts.length) list.appendChild(S.el('p', { class: 'muted', text: 'No accounts yet. Ask the sandbox to create one.' }));
+            accounts.forEach(function (a) {
+              list.appendChild(S.el('div', { class: 'row' }, [
+                S.el('span', { text: a.name }),
+                S.el('span', { class: 'chip', text: a.type })
+              ]));
+            });
+          }).catch(function (error) { say(error.message, true); });
+      }
+
+      function submitRecord(form, path, body, done) {
+        S.api('POST', path, body).then(function () {
+          form.reset();
+          say(done, false);
+          return loadCrm();
+        }).catch(function (error) { say(error.message, true); });
+      }
+
+      document.getElementById('new-account-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var f = event.target;
+        submitRecord(f, '/api/crm/accounts', { name: f.name.value, type: f.type.value }, 'Account added.');
+      });
+
+      document.getElementById('new-opportunity-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var f = event.target;
+        var cents = Math.round(parseFloat(f.amount.value) * 100);
+        submitRecord(f, '/api/crm/opportunities', { account_id: f.account_id.value, name: f.name.value, amount_minor: cents, currency: 'EUR' }, 'Opportunity added.');
+      });
+
+      document.getElementById('new-task-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var f = event.target;
+        var body = { subject_id: f.account_id.value, body: f.body.value };
+        if (f.due.value) body.due_at = new Date(f.due.value).toISOString();
+        submitRecord(f, '/api/crm/tasks', body, 'Task added.');
+      });
+
+      function loadDrafts() {
+        return S.api('GET', '/api/drafts?state=pending').then(function (data) {
+          var box = document.getElementById('drafts');
+          box.textContent = '';
+          if (!data.drafts.length) { box.appendChild(S.el('p', { class: 'muted', text: 'Nothing is waiting. Agents create drafts for anything that leaves the sandbox.' })); return; }
+          data.drafts.forEach(function (d) {
+            var approve = S.el('button', { type: 'button', text: 'Approve' });
+            var reject = S.el('button', { type: 'button', class: 'ghost', text: 'Reject' });
+            approve.addEventListener('click', function () { decide(d.id, 'approve'); });
+            reject.addEventListener('click', function () { decide(d.id, 'reject'); });
+            box.appendChild(S.el('div', { class: 'row', style: 'align-items: start' }, [
+              S.el('div', { style: 'min-width: 0' }, [
+                S.el('div', {}, [S.el('strong', { text: d.kind + ' to ' + d.target }), ' ', S.el('span', { class: 'muted', text: 'by ' + d.created_by })]),
+                S.el('div', { style: 'white-space: pre-wrap; font-size: 13px', text: d.body })
+              ]),
+              S.el('div', { style: 'display: flex; gap: 6px' }, [approve, reject])
+            ]));
+          });
+        }).catch(function (error) { say(error.message, true); });
+      }
+
+      function decide(id, action) {
+        S.api('POST', '/api/drafts/' + encodeURIComponent(id) + '/' + action, {})
+          .then(function () { say('Draft ' + (action === 'approve' ? 'approved' : 'rejected') + '.', false); return Promise.all([loadDrafts(), loadActivity()]); })
+          .catch(function (error) { say(error.message, true); });
+      }
+
+      function loadActivity() {
+        return S.api('GET', '/api/audit?limit=12').then(function (data) {
+          var box = document.getElementById('activity');
+          box.textContent = '';
+          if (!data.events.length) { box.appendChild(S.el('p', { class: 'muted', text: 'No activity yet.' })); return; }
+          data.events.forEach(function (e) {
+            box.appendChild(S.el('div', { class: 'row', style: 'padding: 6px 0' }, [
+              S.el('span', { text: e.action + (e.subject ? ' · ' + e.subject : '') }),
+              S.el('span', { class: 'muted mono', style: 'font-size: 11px', text: e.actor + ' · ' + e.at.slice(11, 19) })
+            ]));
+          });
+        }).catch(function (error) { say(error.message, true); });
+      }
+
+      function bubble(role, text, tools, data) {
+        var node = S.el('div', { class: 'msg ' + role }, [S.el('div', { class: 'bubble', text: text })]);
+        if (tools && tools.length) node.appendChild(S.el('div', { class: 'meta' }, [S.el('span', { text: 'Used ' }), S.el('b', { text: tools.join(', ') })]));
+        if (data) node.appendChild(S.el('div', { class: 'meta', text: data }));
+        log.appendChild(node);
+        log.scrollTop = log.scrollHeight;
+      }
+
+      function showAttachments() {
+        var box = document.getElementById('attached');
+        box.textContent = state.attachments.length ? 'Attached: ' + state.attachments.map(function (a) { return a.filename; }).join(', ') : '';
+      }
+
+      document.getElementById('file-input').addEventListener('change', function (event) {
+        var file = event.target.files[0];
+        if (!file) return;
+        var form = new FormData();
+        form.append('file', file);
+        say('Uploading ' + file.name + '…', false);
+        fetch('/api/chat/attachments', { method: 'POST', credentials: 'same-origin', headers: { 'X-Sandbox-Request': '1' }, body: form })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+              if (!response.ok) throw new Error(data.error || 'Upload failed.');
+              return data;
+            });
+          })
+          .then(function (data) {
+            state.attachments.push({ id: data.id, filename: data.filename });
+            showAttachments();
+            say('Attached ' + data.filename + '. Ask about it in the chat.', false);
+          })
+          .catch(function (error) { say(error.message, true); })
+          .then(function () { event.target.value = ''; });
+      });
+
+      document.getElementById('chat-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var input = event.target.message;
+        var text = input.value.trim();
+        if (!text) return;
+        var send = document.getElementById('chat-send');
+        var sent = state.attachments.slice();
+        send.disabled = true;
+        bubble('user', text + (sent.length ? '\n[' + sent.map(function (a) { return a.filename; }).join(', ') + ']' : ''));
+        input.value = '';
+        var payload = { message: text, history: state.turns.slice(-20), attachment_ids: sent.map(function (a) { return a.id; }) };
+        if (state.scope) payload.agent = state.scope;
+        S.api('POST', '/api/chat', payload).then(function (data) {
+          bubble('assistant', data.reply, data.tool_calls);
+          state.turns.push({ role: 'user', content: text });
+          state.turns.push({ role: 'assistant', content: data.reply });
+          state.attachments = [];
+          showAttachments();
+          return load();
+        }).catch(function (error) {
+          bubble('assistant', error.message);
+        }).then(function () { send.disabled = false; });
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>

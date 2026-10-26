@@ -1,0 +1,28 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+instances/*.env
+.DS_Store
+*.egg-info/
+
+# credentials and keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+credentials*.json
+secrets/
+.mcp.json
+.claude/settings.local.json
+
+# local data
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
