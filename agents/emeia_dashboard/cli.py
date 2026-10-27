@@ -127,3 +127,7 @@ def _dispatch(args, store):
     if args.command == "link-add":
         return service.add_tool_link(store, {"label": args.label, "url": args.url})
     raise ValueError(f"unknown command {args.command}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
