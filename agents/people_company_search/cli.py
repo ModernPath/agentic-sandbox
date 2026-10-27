@@ -71,3 +71,7 @@ def main(argv: Optional[Sequence[str]] = None, environ: Mapping[str, str] = os.e
         return 1
     _emit({"ok": True, "result": result})
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
