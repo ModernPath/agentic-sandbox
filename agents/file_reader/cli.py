@@ -99,3 +99,7 @@ def _dispatch(args, store, llm):
             return service.ask_file(store, llm, args.id, args.question)
         return service.describe_image(store, llm, args.id, args.prompt)
     raise ValueError(f"unknown command {args.command}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

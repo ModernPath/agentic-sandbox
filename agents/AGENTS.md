@@ -36,5 +36,6 @@ Optional, when the agent needs them: `skills/*.md` (guidance loaded into a model
 | `emeia_dashboard` | Host agent. Standard service, tools, CLI, and tests. |
 | `file_reader` | Host agent. Standard service, tools, CLI, and tests. No UI yet (`ui_dir=None`). |
 | `people_company_search` | Standard service, tools, JSON CLI, and tests. Stateless, so no migrations yet; API not mounted (decision pending, see its AGENTS.md). |
+| `meeting_prep` | Host agent. Pre-meeting briefs; calls the radar and file reader through their CLIs. |
 | `competitor_watch` | The sales radar. Pilot of the standard: service, tools, CLI, API, migrations with rollback. |
 | `signal-intelligence` | SignalScout's intelligence agent. Its own project; changes are coordinated with SignalScout. |

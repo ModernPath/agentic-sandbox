@@ -32,6 +32,7 @@ Product-wide documents stay in `specs/`: [Phase 1 PRD](../phase-1-prd.md), [arch
 | emeia_dashboard | [EMEIA dashboard](emeia-dashboard/task_spec.md) | Migrated to the standard |
 | file_reader | [File handling](file-handling/task_spec.md) | Migrated; no UI yet |
 | competitor_watch | [Competitor watch](competitor-watch/task_spec.md), [sales radar](sales-radar/task_spec.md) | The sales radar; pilot of the standard |
+| meeting_prep | [Meeting prep](meeting-prep/task_spec.md) | Built offline and checked on a local host; live run with a model pending |
 | people_company_search | [Exa people and company search](exa-people-company-search/task_spec.md) | Migrated; stateless, API not mounted |
 | signal-intelligence | [Intelligence agent](intelligence-agent/task_spec.md), [intelligence UI](intelligence-ui/task_spec.md) | Its own project |
 
