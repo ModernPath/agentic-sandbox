@@ -23,6 +23,10 @@ A sandbox you instantiate per client to build software and AI agents for that cl
 
 No programming background needed to describe an agent. Start with [the guide for agent builders](docs/building-agents-guide.md) and the [agent request form](specs/templates/agent-request.md).
 
+## Hosting
+
+For the person who runs the sandbox for a client, see [hosting requirements](docs/hosting.md), which covers network, secrets, accounts, data flows, and retention.
+
 ## Run the host
 
 Requirements: Python 3.12 or newer, and a PostgreSQL database (`pgvector` is optional).
