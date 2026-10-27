@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meeting prep · Agentic Sandbox</title>
+  <link rel="stylesheet" href="/static/sandbox.css">
+  <style>
+    .prep-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 16px; align-items: start; }
+    @media (max-width: 760px) { .prep-grid { grid-template-columns: minmax(0, 1fr); } }
+    form.stack { display: flex; flex-direction: column; gap: 10px; }
+    form.stack label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .gaps { color: var(--muted); font-size: 13px; }
+    ol.sources { padding-left: 20px; margin: 0; overflow-wrap: anywhere; }
+    ul.items li button.link { background: none; color: var(--accent); padding: 0; text-align: left; }
+    .row-actions { display: flex; gap: 8px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">Meeting prep</span>
+    <button type="button" class="secondary" id="signout">Sign out</button>
+  </header>
+  <main class="page">
+    <a href="/">← All agents</a>
+    <h1>Meeting prep</h1>
+    <p class="subtle">A one-page brief before a meeting: recent public news, sales radar signals, your notes, talking points, and open questions. It is a draft: check every citation. Briefs are deleted after 30 days.</p>
+    <div id="message" role="status" aria-live="polite"></div>
+
+    <div class="prep-grid">
+      <section class="panel">
+        <h2>New brief</h2>
+        <form id="prep-form" class="stack">
+          <label>Company<input name="company" required minlength="2" maxlength="120" placeholder="e.g. Acme Oy"></label>
+          <div class="two">
+            <label>Meeting date<input name="meeting_date" type="date"></label>
+            <label>Website<input name="website" type="url" maxlength="500" placeholder="https://"></label>
+          </div>
+          <label>Purpose<input name="purpose" maxlength="500" placeholder="e.g. Renewal and expansion"></label>
+          <label>Attendees, one per line as Name (Role)<textarea name="attendees" rows="3" placeholder="Ana Silva (CTO)"></textarea></label>
+          <label>Notes file (from File reader)<select name="notes_file_id" id="notes"><option value="">No notes file</option></select></label>
+          <button type="submit" id="submit">Prepare brief</button>
+        </form>
+      </section>
+
+      <section class="panel" id="result" hidden>
+        <h2 id="result-title"></h2>
+        <p class="item-meta" id="result-meta"></p>
+        <div class="summary" id="result-summary"></div>
+        <p class="gaps" id="result-gaps"></p>
+        <h3>Sources</h3>
+        <ol class="sources" id="result-sources"></ol>
+        <div class="row-actions"><button type="button" class="secondary" id="delete">Delete brief</button></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Recent briefs</h2>
+      <div id="history"></div>
+    </section>
+  </main>
+  <script src="/static/sandbox.js"></script>
+  <script>
+    (function () {
+      var S = window.Sandbox;
+      var API = '/api/agents/meeting-prep/briefs';
+      var form = document.getElementById('prep-form');
+      var submit = document.getElementById('submit');
+      var message = document.getElementById('message');
+      var current = null;
+
+      function say(text, isError) {
+        message.textContent = '';
+        if (text) message.appendChild(S.banner(text, isError));
+      }
+
+      function attendees(text) {
+        return text.split('\n').map(function (line) { return line.trim(); }).filter(Boolean).map(function (line) {
+          var match = /^(.*?)\s*\(([^()]*)\)$/.exec(line);
+          return match ? { name: match[1].trim(), role: match[2].trim() } : { name: line, role: '' };
+        });
+      }
+
+      function show(brief) {
+        current = brief;
+        document.getElementById('result').hidden = false;
+        document.getElementById('result-title').textContent = brief.company;
+        var meta = [brief.meeting_date ? 'Meeting ' + brief.meeting_date : 'No meeting date',
+                    'prepared ' + brief.created_at.slice(0, 16).replace('T', ' ')];
+        if (brief.attendees.length) meta.push(brief.attendees.map(function (a) {
+          return a.role ? a.name + ' (' + a.role + ')' : a.name;
+        }).join(', '));
+        if (brief.notes_file) meta.push('notes: ' + brief.notes_file.filename);
+        document.getElementById('result-meta').textContent = meta.join(' · ');
+        document.getElementById('result-summary').textContent = brief.summary || brief.reason || '';
+        document.getElementById('result-gaps').textContent = brief.gaps.join(' ');
+        var list = document.getElementById('result-sources');
+        list.textContent = '';
+        if (!brief.sources.length) list.appendChild(S.el('li', { text: 'No sources.' }));
+        brief.sources.forEach(function (source) {
+          list.appendChild(S.el('li', { value: String(source.number) }, [
+            (source.kind === 'signal' ? 'Radar: ' : '') + source.title + ' ', S.link(source.url, source.url)]));
+        });
+      }
+
+      function loadHistory() {
+        return S.api('GET', API).then(function (data) {
+          var history = document.getElementById('history');
+          history.textContent = '';
+          if (!data.briefs.length) { history.appendChild(S.el('p', { className: 'empty', text: 'No briefs yet.' })); return; }
+          history.appendChild(S.el('ul', { className: 'items' }, data.briefs.map(function (brief) {
+            var open = S.el('button', { type: 'button', className: 'link', text: brief.company });
+            open.addEventListener('click', function () {
+              S.api('GET', API + '/' + encodeURIComponent(brief.id)).then(show).catch(function (e) { say(e.message, true); });
+            });
+            return S.el('li', {}, [open, S.el('div', { className: 'item-meta',
+              text: (brief.meeting_date ? 'Meeting ' + brief.meeting_date + ' · ' : '') + brief.created_at.slice(0, 10) })]);
+          })));
+        }).catch(function (e) { say(e.message, true); });
+      }
+
+      function loadNotes() {
+        S.api('GET', '/api/agents/file-reader/files').then(function (data) {
+          var select = document.getElementById('notes');
+          (data.files || []).forEach(function (file) {
+            select.appendChild(S.el('option', { value: file.id, text: file.filename }));
+          });
+        }).catch(function () { /* File reader is optional */ });
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var body = {
+          company: form.company.value.trim(), website: form.website.value.trim(),
+          meeting_date: form.meeting_date.value, purpose: form.purpose.value.trim(),
+          attendees: attendees(form.attendees.value), notes_file_id: form.notes_file_id.value
+        };
+        submit.disabled = true;
+        say('Preparing the brief… this can take a minute.');
+        S.api('POST', API, body).then(function (brief) {
+          say('Brief saved. Check every citation before you use it.');
+          show(brief);
+          return loadHistory();
+        }).catch(function (e) { say(e.message, true); }).then(function () { submit.disabled = false; });
+      });
+
+      document.getElementById('delete').addEventListener('click', function () {
+        if (!current || !window.confirm('Delete the brief for ' + current.company + '?')) return;
+        S.api('DELETE', API + '/' + encodeURIComponent(current.id)).then(function () {
+          current = null;
+          document.getElementById('result').hidden = true;
+          say('Brief deleted.');
+          return loadHistory();
+        }).catch(function (e) { say(e.message, true); });
+      });
+
+      document.getElementById('signout').addEventListener('click', function () { S.signOut(); });
+      loadHistory();
+      loadNotes();
+    })();
+  </script>
+</body>
+</html>

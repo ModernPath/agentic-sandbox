@@ -138,3 +138,23 @@ def test_document_upload_stores_bytes_recoverable_for_reading():  # A-12
     with client() as c:
         file_id = upload(c, "hello.txt", raw).json()["id"]
         assert c.get(f"{BASE}/files/{file_id}").json()["text"] == "hello"
+
+
+def test_cli_runs_as_a_module_and_prints_json(tmp_path):  # the chat and peer agents run `python -m file_reader.cli`
+    import json
+    import os
+    import subprocess
+    import sys
+
+    from sandbox_host.cli_bridge import default_pythonpath
+    from sandbox_host.migrations import apply_agent_migrations
+
+    url = f"sqlite+pysqlite:///{tmp_path / 'files.sqlite'}"
+    engine = create_engine(url)
+    spec = make_agent_spec()
+    apply_agent_migrations(engine, spec.name, spec.migrations_dir)
+    engine.dispose()
+    proc = subprocess.run([sys.executable, "-m", "file_reader.cli", "list"], capture_output=True, text=True,
+                          env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": default_pythonpath(),
+                               "DATABASE_URL": url}, timeout=60)
+    assert json.loads(proc.stdout) == {"ok": True, "result": []}

@@ -13,6 +13,7 @@ from file_reader.api import make_agent_spec as make_file_reader_spec
 from competitor_watch.api import make_agent_spec as make_competitor_watch_spec
 from research_brief.api import make_agent_spec
 # <scaffold:imports>
+from meeting_prep.api import make_agent_spec as make_meeting_prep_spec
 
 AGENTS = [
     make_agent_spec(),
@@ -20,6 +21,7 @@ AGENTS = [
     make_file_reader_spec(),
     make_competitor_watch_spec(),
     # <scaffold:agents>
+    make_meeting_prep_spec(),
 ]
 
 
