@@ -19,6 +19,10 @@ A sandbox you instantiate per client to build software and AI agents for that cl
 | `instances/` | Per-client environment templates (real `*.env` files are git-ignored) |
 | `tests/` | Host and building-block tests (offline) |
 
+## Build an agent
+
+No programming background needed to describe an agent. Start with [the guide for agent builders](docs/building-agents-guide.md) and the [agent request form](specs/templates/agent-request.md).
+
 ## Run the host
 
 Requirements: Python 3.12 or newer, and a PostgreSQL database (`pgvector` is optional).
