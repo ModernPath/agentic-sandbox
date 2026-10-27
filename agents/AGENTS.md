@@ -1,5 +1,7 @@
 # AGENTS.md — agents/
 
+> Building an agent for a non-developer? Read [docs/building-agents-guide.md](../docs/building-agents-guide.md) first; it explains roles, the steps, and the rules to follow.
+
 Every agent that runs on the Agentic Sandbox host lives here, one folder per agent. Read the root `AGENTS.md` first.
 
 ## The standard (required)
