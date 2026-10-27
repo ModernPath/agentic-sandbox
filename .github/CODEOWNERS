@@ -1,0 +1,20 @@
+# Changes to these paths need a review from the owner below.
+# Replace @pasilastbot with a team (for example @ModernPath/maintainers) once one exists.
+
+# Shared host: sign-in, the database, the chat's command-line bridge, governance, and the CRM core
+/src/sandbox_host/              @pasilastbot
+/sandbox_app.py                 @pasilastbot
+/src/sandbox_blocks/            @pasilastbot
+
+# Database structure and shared migrations
+/src/sandbox_host/migrations/   @pasilastbot
+/agents/*/migrations/           @pasilastbot
+
+# Deployment, dependencies, and automation
+/.github/                       @pasilastbot
+/Dockerfile*                    @pasilastbot
+/compose*.yaml                  @pasilastbot
+/pyproject.toml                 @pasilastbot
+/requirements*.lock             @pasilastbot
+/.gitignore                     @pasilastbot
+/.env.example                   @pasilastbot
