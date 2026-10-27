@@ -14,8 +14,13 @@
 | Browser (Playwright, Chromium): sign in, prepare with attendees and a notes file, open, delete, sign out | Passed. No console errors. No horizontal scroll at 375 px width |
 | `python -m meeting_prep.cli list / prepare / purge`; `prepare` without `--company` | JSON envelopes; exit 2 on bad usage |
 
+## Follow-up: attendees and chat (2026-10-27)
+
+- Attendees are a section of the brief, written in code from the typed names and roles. Tests MP-20 to MP-24 cover it, including typed text trying to add headings.
+- Live, real search and model keys, on the local host with its PostgreSQL development database: a chat message ("prepare a brief for ... attendee Jane Example, Procurement") called the brief tool. The saved brief had all five model sections plus Attendees. The brief was deleted afterwards.
+- CI passed on pull request #10 (tests on PostgreSQL, root and agents, and signal-intelligence).
+
 ## Not yet verified
 
-- A live brief with the configured search, page reader, and model (written summary, citations, and talking points quality).
-- Running on PostgreSQL. The migration is plain SQL with text columns, like the other agents, but has only been run on SQLite.
-- The common chat calling `meeting-prep__prepare_meeting` with a real model.
+- Quality of the talking points and open questions across several real companies. Two live briefs were checked for structure, citations, and use of the notes, not for usefulness.
+- Running on the hosted environment (no deployment yet).
