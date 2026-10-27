@@ -89,6 +89,24 @@ def draft(llm, details: dict, sources: list[dict], signals: list[dict], notes_te
             "provider": answer.provider, "model": answer.model}
 
 
+def attendees_section(attendees: list[dict]) -> Optional[str]:
+    """The attendees section is written in code from what the requester typed, never by the model."""
+    if not attendees:
+        return None
+    lines = ["## Attendees", ""]
+    for attendee in attendees:
+        name = _one_line(attendee.get("name"))
+        role = _one_line(attendee.get("role"))
+        lines.append(f"- {name}, {role}" if role else f"- {name}")
+    lines += ["", "Names and roles are as entered by the requester. No public background was checked for them."]
+    return "\n".join(lines)
+
+
+def _one_line(value) -> str:
+    """Collapse whitespace, so typed text cannot start a new Markdown line or heading."""
+    return " ".join(str(value or "").split())
+
+
 def build_prompt(details: dict, sources: list[dict], signals: list[dict], notes_text: Optional[str]) -> str:
     lines = [f"Company: {details['company']}"]
     if details.get("website"):

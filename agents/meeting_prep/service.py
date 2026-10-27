@@ -48,11 +48,16 @@ def prepare_brief(store, request: dict, *, search, read_page, llm, signals, note
             gaps.append(NOTES_FAILED)
 
     written = prep.draft(llm, details, sources, found, notes_text)
+    summary = written["summary"]
+    section = prep.attendees_section(details["attendees"])
+    if summary and section:
+        # Leave room for the attendees section, so the cap never cuts it off.
+        summary = summary[: prep.MAX_SUMMARY - len(section) - 2] + "\n\n" + section
     record = {
         "id": str(uuid4()),
         "company": details["company"], "website": details["website"], "meeting_date": details["meeting_date"],
         "purpose": details["purpose"], "attendees": details["attendees"], "notes_file": notes_file,
-        "summary": written["summary"], "reason": written["reason"],
+        "summary": summary, "reason": written["reason"],
         "sources": [{k: s[k] for k in ("number", "kind", "title", "url")} for s in sources]
         + [{"number": s["number"], "kind": "signal", "title": f"{s['competitor_name']}: {s['headline']}",
             "url": s["source_url"]} for s in found],
