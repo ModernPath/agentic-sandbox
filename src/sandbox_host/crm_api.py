@@ -31,6 +31,14 @@ class OpportunityCreate(BaseModel):
     close_date: Optional[str] = Field(default=None, max_length=40)
 
 
+class ContactCreate(BaseModel):
+    account_id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=2, max_length=120)
+    email: Optional[str] = Field(default=None, max_length=254)
+    phone: Optional[str] = Field(default=None, max_length=40)
+    title: Optional[str] = Field(default=None, max_length=120)
+
+
 class StageChange(BaseModel):
     stage: str = Field(min_length=1, max_length=20)
 
@@ -85,6 +93,24 @@ def delete_account(account_id: str, request: Request) -> dict:
     return {"archived": True}
 
 
+@router.get("/crm/contacts")
+def get_contacts(request: Request, account_id: str) -> dict:
+    return {"contacts": _call(lambda: crm.list_contacts(_engine(request), account_id))}
+
+
+@router.post("/crm/contacts", status_code=201)
+def post_contact(payload: ContactCreate, request: Request) -> dict:
+    return _call(lambda: crm.create_contact(_engine(request), _user(request), payload.account_id, payload.name,
+                                            payload.email or "", payload.phone or "", payload.title or ""))
+
+
+@router.delete("/crm/contacts/{contact_id}")
+def delete_contact(contact_id: str, request: Request) -> dict:
+    if not crm.archive_contact(_engine(request), _user(request), contact_id):
+        raise HTTPException(status_code=404, detail="Contact not found")
+    return {"archived": True}
+
+
 @router.get("/crm/opportunities")
 def get_opportunities(request: Request, stage: str = "") -> dict:
     return {"opportunities": _call(lambda: crm.list_opportunities(_engine(request), stage or None))}
@@ -128,6 +154,14 @@ def build_tools(engine, user: str) -> list[Tool]:
         """Create an account. type is customer, prospect, competitor, or partner."""
         return _safe(lambda: crm.create_account(engine, user, name, type, website, industry))
 
+    def list_contacts(account_id: str) -> dict:
+        """List the contacts (people) of one account, by account id."""
+        return _safe(lambda: {"contacts": crm.list_contacts(engine, account_id)})
+
+    def add_contact(account_id: str, name: str, email: str = "", title: str = "") -> dict:
+        """Add a person to an account. email is optional and must be unique on that account."""
+        return _safe(lambda: crm.create_contact(engine, user, account_id, name, email, "", title))
+
     def list_opportunities(stage: str = "") -> dict:
         """List opportunities (not archived), optionally by stage."""
         return _safe(lambda: {"opportunities": crm.list_opportunities(engine, stage or None)})
@@ -156,8 +190,8 @@ def build_tools(engine, user: str) -> list[Tool]:
         """Totals: accounts, open opportunities, open pipeline and won amounts (in minor units), overdue tasks."""
         return _safe(lambda: crm.summary(engine))
 
-    functions = [list_accounts, create_account, list_opportunities, create_opportunity, set_stage,
-                 list_open_tasks, add_task, complete_task, summary]
+    functions = [list_accounts, create_account, list_contacts, add_contact, list_opportunities, create_opportunity,
+                 set_stage, list_open_tasks, add_task, complete_task, summary]
     tools = []
     for fn in functions:
         tool = tool_from_function(fn)

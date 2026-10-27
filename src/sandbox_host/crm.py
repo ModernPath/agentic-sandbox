@@ -5,6 +5,7 @@ Every write is audited with the signed-in user as actor. Records are archived, n
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -99,6 +100,54 @@ def archive_account(engine: Engine, user: str, account_id: str) -> bool:
     _write(engine, "UPDATE crm_accounts SET archived = 1, updated_at = :now WHERE id = :id",
            {"id": account_id, "now": _now()})
     audit.record(engine, actor="user:" + user, action="account.archived", subject=f"account:{account_id}")
+    return True
+
+
+# contacts (people at an account). Contact details are personal data: kept until archived.
+EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PHONE = re.compile(r"^\+?[0-9 ()\-]{5,40}$")
+
+
+def create_contact(engine: Engine, user: str, account_id: str, name: str, email: str = "", phone: str = "",
+                   title: str = "") -> dict:
+    if not _one(engine, "SELECT id FROM crm_accounts WHERE id = :id AND archived = 0", {"id": account_id}):
+        raise LookupError("Account not found")
+    name = _clean_name(name, 2, 120, "Name")
+    email = (email or "").strip()
+    if email and (len(email) > 254 or not EMAIL.match(email)):
+        raise ValueError("Email address is not valid")
+    phone = (phone or "").strip()
+    if phone and not PHONE.match(phone):
+        raise ValueError("Phone number may contain digits, spaces, brackets, and a leading +")
+    if len(title or "") > 120:
+        raise ValueError("Title must be at most 120 characters")
+    email_key = email.lower() or None
+    if email_key and _one(engine, "SELECT id FROM crm_contacts WHERE account_id = :a AND email_key = :k AND archived = 0",
+                          {"a": account_id, "k": email_key}):
+        raise DuplicateError("That email is already a contact on this account")
+    now = _now()
+    row = {"id": str(uuid.uuid4()), "account_id": account_id, "name": name, "email": email or None,
+           "email_key": email_key, "phone": phone, "title": (title or "").strip(), "owner": user, "archived": 0,
+           "created_at": now, "updated_at": now}
+    _write(engine, "INSERT INTO crm_contacts (id, account_id, name, email, email_key, phone, title, owner, archived, "
+                   "created_at, updated_at) VALUES (:id, :account_id, :name, :email, :email_key, :phone, :title, "
+                   ":owner, :archived, :created_at, :updated_at)", row)
+    audit.record(engine, actor="user:" + user, action="contact.created", subject=f"contact:{row['id']}",
+                 detail={"account_id": account_id})
+    return row
+
+
+def list_contacts(engine: Engine, account_id: str) -> list[dict]:
+    return _rows(engine, "SELECT * FROM crm_contacts WHERE account_id = :a AND archived = 0 ORDER BY name",
+                 {"a": account_id})
+
+
+def archive_contact(engine: Engine, user: str, contact_id: str) -> bool:
+    if not _one(engine, "SELECT id FROM crm_contacts WHERE id = :id AND archived = 0", {"id": contact_id}):
+        return False
+    _write(engine, "UPDATE crm_contacts SET archived = 1, updated_at = :now WHERE id = :id",
+           {"id": contact_id, "now": _now()})
+    audit.record(engine, actor="user:" + user, action="contact.archived", subject=f"contact:{contact_id}")
     return True
 
 
